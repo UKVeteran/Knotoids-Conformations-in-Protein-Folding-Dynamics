@@ -214,6 +214,84 @@ if __name__ == "__main__":
 python calculate_topology.py
 </code></pre>
 
+
+<h3 id="python-code">Comparative Topological Analyzer</h3>
+
+<p>To demonstrate how writhe distinguishes between native structural motifs and complex entanglements, this script compares a trivial open coil (alpha-helix) against a highly entangled $5_1$ knotoid (cinquefoil) motif.</p>
+
+<pre><code class="language-python">import numpy as np
+
+def generate_alpha_helix(n_points=250, turns=5):
+    """Generates a trivial 3D open curve (Alpha-Helix motif)."""
+    t = np.linspace(0, turns * 2 * np.pi, n_points)
+    x = np.cos(t)
+    y = np.sin(t)
+    z = 0.15 * t  # Linear elongation along the z-axis
+    return np.column_stack((x, y, z))
+
+def generate_cinquefoil_backbone(n_points=250):
+    """Generates a highly entangled 3D open curve (Cinquefoil 5_1 knotoid motif)."""
+    # Parametrization based on a (5, 2) Torus Knot
+    t = np.linspace(0.1, 2 * np.pi - 0.1, n_points)
+    r = 2 + np.cos(5 * t)
+    x = r * np.cos(2 * t)
+    y = r * np.sin(2 * t)
+    z = -np.sin(5 * t)
+    return np.column_stack((x, y, z))
+
+def compute_discrete_writhe(coords):
+    """
+    Computes the writhe of a 3D curve using the discrete Gauss integral.
+    Formula: Wr = (1 / 4*pi) * sum( (dr_i x dr_j) \cdot r_ij / |r_ij|^3 )
+    """
+    n = len(coords)
+    writhe = 0.0
+    
+    # Calculate tangent vectors (dr) for each segment
+    dr = np.diff(coords, axis=0)
+    
+    # Midpoints of each segment for distance calculations
+    midpoints = (coords[:-1] + coords[1:]) / 2.0
+    
+    for i in range(n - 1):
+        for j in range(i + 2, n - 1): # Skip adjacent segments to avoid singularities
+            # Vector between segment midpoints
+            r_ij = midpoints[i] - midpoints[j]
+            dist = np.linalg.norm(r_ij)
+            
+            if dist > 1e-6:
+                # Cross product of tangent vectors
+                cross_prod = np.cross(dr[i], dr[j])
+                
+                # Scalar triple product divided by distance cubed
+                solid_angle = np.dot(cross_prod, r_ij) / (dist ** 3)
+                writhe += solid_angle
+                
+    return writhe / (4 * np.pi)
+
+if __name__ == "__main__":
+    print("Initializing comparative topological analysis...\n")
+    
+    # --- State 1: Alpha Helix ---
+    helix = generate_alpha_helix(300)
+    wr_helix = compute_discrete_writhe(helix)
+    
+    print("--- State A: Alpha-Helix Conformation ---")
+    print(f"Total Backbone Atoms: {len(helix)}")
+    print(f"Calculated 3D Writhe: {wr_helix:.4f}")
+    if abs(wr_helix) < 1.5:
+        print("Topology: Trivial / Secondary Structure\n")
+        
+    # --- State 2: Cinquefoil Knotoid ---
+    cinquefoil = generate_cinquefoil_backbone(300)
+    wr_cinq = compute_discrete_writhe(cinquefoil)
+    
+    print("--- State B: Cinquefoil (5_1) Conformation ---")
+    print(f"Total Backbone Atoms: {len(cinquefoil)}")
+    print(f"Calculated 3D Writhe: {wr_cinq:.4f}")
+    if abs(wr_cinq) > 3.5:
+        print("Topology: Deeply Entangled (Complex Knotoid)")
+</code></pre>
 <hr>
 
 <h2 id="references">References</h2>
