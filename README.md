@@ -142,40 +142,76 @@ $$F(Q,\mathcal{K})=-k_BT\ln\int\delta(Q(\mathbf{r})-Q)\delta(\text{dom}(K_v)-\ma
 
 <hr>
 
-<h2 id="installation-usage">Installation &amp; Usage</h2>
+<h2 id="implementation">Standalone Implementation</h2>
 
-<h3 id="requirements">1. Requirements</h3>
-<ul>
-  <li><b>Python:</b> 3.9+</li>
-  <li><b>Dependencies:</b> <code>numpy</code>, <code>scipy</code>, <code>mdtraj</code>, <code>networkx</code></li>
-</ul>
+<p>To demonstrate the core topological calculations without requiring complex external dependencies, the following standalone Python script calculates the <b>discrete 3D Writhe</b> of a polypeptide backbone.</p> 
 
-<h3 id="installation">2. Installation</h3>
-<p>Clone the repository and install via <code>pip</code>:</p>
+<p>The writhe $w(K)$ is approximated via the double sum over all non-adjacent segment pairs (a discrete analogue of the Gauss linking integral). This structural parameter is a fundamental component for normalizing the Kauffman bracket in knotoid evaluation.</p>
 
-<pre><code class="language-bash">git clone https://github.com/your-org/knotoid-dynamics.git
-cd knotoid-dynamics
-pip install -r requirements.txt
-python setup.py install
+<h3 id="python-code">Python Topological Analyzer</h3>
+
+<pre><code class="language-python">import numpy as np
+
+def generate_trefoil_backbone(n_points=150):
+    """Generates a synthetic 3D open curve (trefoil knotoid motif)."""
+    t = np.linspace(0.1, 2 * np.pi - 0.1, n_points)
+    x = np.sin(t) + 2 * np.sin(2 * t)
+    y = np.cos(t) - 2 * np.cos(2 * t)
+    z = -np.sin(3 * t)
+    return np.column_stack((x, y, z))
+
+def compute_discrete_writhe(coords):
+    """
+    Computes the writhe of a 3D curve using the discrete Gauss integral.
+    Formula: Wr = (1 / 4*pi) * sum( (dr_i x dr_j) \cdot r_ij / |r_ij|^3 )
+    """
+    n = len(coords)
+    writhe = 0.0
+    
+    # Calculate tangent vectors (dr) for each segment
+    dr = np.diff(coords, axis=0)
+    
+    # Midpoints of each segment for distance calculations
+    midpoints = (coords[:-1] + coords[1:]) / 2.0
+    
+    for i in range(n - 1):
+        for j in range(i + 2, n - 1): # Skip adjacent segments to avoid singularities
+            # Vector between segment midpoints
+            r_ij = midpoints[i] - midpoints[j]
+            dist = np.linalg.norm(r_ij)
+            
+            if dist > 1e-6:
+                # Cross product of tangent vectors
+                cross_prod = np.cross(dr[i], dr[j])
+                
+                # Scalar triple product divided by distance cubed
+                solid_angle = np.dot(cross_prod, r_ij) / (dist ** 3)
+                writhe += solid_angle
+                
+    return writhe / (4 * np.pi)
+
+if __name__ == "__main__":
+    print("Initializing topological analysis...")
+    
+    # 1. Generate conformation (e.g., from MD trajectory)
+    backbone = generate_trefoil_backbone(200)
+    
+    # 2. Compute topological invariant
+    wr = compute_discrete_writhe(backbone)
+    
+    print(f"Total Backbone Atoms: {len(backbone)}")
+    print(f"Calculated 3D Writhe: {wr:.4f}")
+    
+    if abs(wr) > 2.5:
+        print("Topology State: Highly entangled (Non-trivial Knotoid likely)")
+    else:
+        print("Topology State: Trivial / Open chain")
 </code></pre>
 
-<h3 id="quickstart">3. Quickstart: Analyzing a Trajectory</h3>
-<p>You can extract the knotoid spectrum from an existing <code>.xtc</code> or <code>.dcd</code> trajectory:</p>
+<p><b>Dependencies:</b> This script only requires standard numerical libraries. You can execute it directly after installing numpy:</p>
 
-<pre><code class="language-python">import mdtraj as md
-from knotoids.topology import KnotoidSpectrum
-
-# Load trajectory and topology
-traj = md.load('folding_trajectory.xtc', top='protein.pdb')
-
-# Initialize the analyzer with 100 projection vectors
-analyzer = KnotoidSpectrum(projection_vectors=100)
-
-# Compute the spectrum for a specific frame (e.g., frame 500)
-spectrum = analyzer.compute_spectrum(traj[500])
-
-print(f"Dominant Knotoid Type: {spectrum.dominant_class}")
-print(f"Jones Polynomial: {spectrum.jones_poly}")
+<pre><code class="language-bash">pip install numpy
+python calculate_topology.py
 </code></pre>
 
 <hr>
